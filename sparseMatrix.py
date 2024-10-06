@@ -1,125 +1,93 @@
-class Node:
-    def __init__(self, row, col, value):
-        self.row = row
-        self.col = col
-        self.value = value
-        self.next = None
-
 class SparseMatrix:
-    def __init__(self, numRows, numCols):
-        self.numRows = numRows
-        self.numCols = numCols
-        self.head = None
-
-    def add_element(self, row, col, value):
-        new_node = Node(row, col, value)
-        if not self.head:
-            self.head = new_node
+    def __init__(self, matrixFilePath=None, numRows=None, numCols=None):
+        self.matrix = {}
+        if matrixFilePath:
+            self.load_from_file(matrixFilePath)
         else:
-            current = self.head
-            while current.next:
-                current = current.next
-            current.next = new_node
+            self.numRows = numRows
+            self.numCols = numCols
 
-    def get_element(self, row, col):
-        current = self.head
-        while current:
-            if current.row == row and current.col == col:
-                return current.value
-            current = current.next
-        return 0
+    def load_from_file(self, matrixFilePath):
+        with open(matrixFilePath, 'r') as file:
+            self.numRows = int(self._parse_line(file.readline()))
+            self.numCols = int(self._parse_line(file.readline()))
+            for line in file:
+                row, col, value = self._parse_tuple(line.strip())
+                self.matrix[(row, col)] = value
 
-    def set_element(self, row, col, value):
-        current = self.head
-        while current:
-            if current.row == row and current.col == col:
-                current.value = value
-                return
-            current = current.next
-        self.add_element(row, col, value)
+    def _parse_line(self, line):
+        return line.split('=')[1]
 
-    def display(self):
-        current = self.head
-        while current:
-            print(f"({current.row}, {current.col}, {current.value})")
-            current = current.next
+    def _parse_tuple(self, line):
+        line = line[1:-1]  # Remove parentheses
+        return tuple(map(int, line.split(',')))
+
+    def getElement(self, currRow, currCol):
+        return self.matrix.get((currRow, currCol), 0)
+
+    def setElement(self, currRow, currCol, value):
+        if value != 0:
+            self.matrix[(currRow, currCol)] = value
+        elif (currRow, currCol) in self.matrix:
+            del self.matrix[(currRow, currCol)]
 
     def add(self, other):
         if self.numRows != other.numRows or self.numCols != other.numCols:
-            raise ValueError("Matrices dimensions do not match for addition.")
-        result = SparseMatrix(self.numRows, self.numCols)
-        current = self.head
-        while current:
-            result.set_element(current.row, current.col, current.value)
-            current = current.next
-        current = other.head
-        while current:
-            result.set_element(current.row, current.col, result.get_element(current.row, current.col) + current.value)
-            current = current.next
+            raise ValueError("Matrices dimensions do not match for addition")
+        result = SparseMatrix(numRows=self.numRows, numCols=self.numCols)
+        for (row, col), value in self.matrix.items():
+            result.setElement(row, col, value + other.getElement(row, col))
+        for (row, col), value in other.matrix.items():
+            if (row, col) not in self.matrix:
+                result.setElement(row, col, value)
         return result
 
     def subtract(self, other):
         if self.numRows != other.numRows or self.numCols != other.numCols:
-            raise ValueError("Matrices dimensions do not match for subtraction.")
-        result = SparseMatrix(self.numRows, self.numCols)
-        current = self.head
-        while current:
-            result.set_element(current.row, current.col, current.value)
-            current = current.next
-        current = other.head
-        while current:
-            result.set_element(current.row, current.col, result.get_element(current.row, current.col) - current.value)
-            current = current.next
+            raise ValueError("Matrices dimensions do not match for subtraction")
+        result = SparseMatrix(numRows=self.numRows, numCols=self.numCols)
+        for (row, col), value in self.matrix.items():
+            result.setElement(row, col, value - other.getElement(row, col))
+        for (row, col), value in other.matrix.items():
+            if (row, col) not in self.matrix:
+                result.setElement(row, col, -value)
         return result
 
     def multiply(self, other):
         if self.numCols != other.numRows:
-            raise ValueError("Matrices dimensions do not match for multiplication.")
-        result = SparseMatrix(self.numRows, other.numCols)
-        current = self.head
-        while current:
-            other_current = other.head
-            while other_current:
-                if current.col == other_current.row:
-                    result.set_element(current.row, other_current.col, result.get_element(current.row, other_current.col) + current.value * other_current.value)
-                other_current = other_current.next
-            current = current.next
+            raise ValueError("Matrices dimensions do not match for multiplication")
+        result = SparseMatrix(numRows=self.numRows, numCols=other.numCols)
+        for (row, col), value in self.matrix.items():
+            for k in range(other.numCols):
+                result.setElement(row, k, result.getElement(row, k) + value * other.getElement(col, k))
         return result
 
-    @staticmethod
-    def from_file(file_path):
-        with open(file_path, 'r') as file:
-            numRows = int(file.readline().split('=')[1])
-            numCols = int(file.readline().split('=')[1])
-            matrix = SparseMatrix(numRows, numCols)
-            for line in file:
-                row, col, value = map(int, line.strip()[1:-1].split(','))
-                matrix.add_element(row, col, value)
-        return matrix
-
 def main():
-    try:
-        operation = input("Select operation (add, subtract, multiply): ").strip().lower()
-        file1 = input("Enter the path for the first matrix file: ").strip()
-        file2 = input("Enter the path for the second matrix file: ").strip()
+    print("Select the matrix operation you want to perform:")
+    print("1. Addition")
+    print("2. Subtraction")
+    print("3. Multiplication")
+    choice = input("Enter your choice (1/2/3): ")
 
-        matrix1 = SparseMatrix.from_file(file1)
-        matrix2 = SparseMatrix.from_file(file2)
+    file1 = input("Enter the path for the first matrix file: ")
+    file2 = input("Enter the path for the second matrix file: ")
 
-        if operation == "add":
-            result = matrix1.add(matrix2)
-        elif operation == "subtract":
-            result = matrix1.subtract(matrix2)
-        elif operation == "multiply":
-            result = matrix1.multiply(matrix2)
-        else:
-            raise ValueError("Invalid operation selected.")
+    matrix1 = SparseMatrix(matrixFilePath=file1)
+    matrix2 = SparseMatrix(matrixFilePath=file2)
 
-        print("Result:")
-        result.display()
+    if choice == '1':
+        result = matrix1.add(matrix2)
+    elif choice == '2':
+        result = matrix1.subtract(matrix2)
+    elif choice == '3':
+        result = matrix1.multiply(matrix2)
+    else:
+        print("Invalid choice")
+        return
 
-    except Exception as e:
-        print(f"Error: {e}")
+    print("Resultant Matrix:")
+    for (row, col), value in result.matrix.items():
+        print(f"({row}, {col}, {value})")
 
 if __name__ == "__main__":
     main()
